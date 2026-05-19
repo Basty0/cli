@@ -138,6 +138,12 @@ npm pack --dry-run
 npm publish
 ```
 
+Si npm demande un code 2FA, publie avec le code OTP :
+
+```bash
+npm publish --otp=123456
+```
+
 Si npm refuse avec une erreur `403` liée à la sécurité, active la 2FA sur ton compte npm, puis relance `npm publish`.
 
 ### Publier une mise à jour
@@ -147,29 +153,57 @@ Si npm refuse avec une erreur `403` liée à la sécurité, active la 2FA sur to
 Patch :
 
 ```bash
-npm version patch
+npm version patch --no-git-tag-version
 npm publish
 ```
 
 Minor :
 
 ```bash
-npm version minor
+npm version minor --no-git-tag-version
 npm publish
 ```
 
 Major :
 
 ```bash
-npm version major
+npm version major --no-git-tag-version
 npm publish
 ```
+
+Le flag `--no-git-tag-version` évite l'erreur :
+
+```bash
+npm error Git working directory not clean.
+```
+
+Tu peux vérifier la version avant publication avec :
+
+```bash
+npm pkg get version
+```
+
+Si npm refuse avec :
+
+```bash
+You cannot publish over the previously published versions
+```
+
+cela signifie que cette version existe déjà. Il faut augmenter la version puis republier.
 
 Exemples :
 
 - `0.1.0` -> `0.1.1` avec `patch`
 - `0.1.0` -> `0.2.0` avec `minor`
 - `0.1.0` -> `1.0.0` avec `major`
+
+Exemple complet pour une mise à jour simple :
+
+```bash
+npm version patch --no-git-tag-version
+npm pkg get version
+npm publish
+```
 
 ## Installer depuis npm sur une autre machine
 

@@ -1,6 +1,6 @@
 {
   "name": "magique-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Modern multi-provider AI chat CLI",
   "type": "module",
   "bin": {
