@@ -28,7 +28,7 @@ async function ensureConfigured(): Promise<void> {
 }
 
 program
-  .name('magic-cli')
+  .name('magique-cli')
   .description('Une CLI IA moderne multi-fournisseurs')
   .version('0.1.0');
 

@@ -5,7 +5,7 @@ import { promptPassword } from '../utils/prompts.js';
 export async function loginCommand(): Promise<void> {
   const current = getStoredConfig();
   if (!current.provider || !current.model) {
-    throw new Error('Aucun fournisseur configuré. Lancez `magic-cli` d’abord.');
+    throw new Error('Aucun fournisseur configuré. Lancez `magique-cli` d’abord.');
   }
 
   const provider = getProvider(current.provider);

@@ -58,7 +58,7 @@ function renderWelcome() {
       padding: 1,
       margin: 1,
       borderColor: "cyan",
-      title: " magic-cli ",
+      title: " magique-cli ",
       titleAlignment: "center"
     }
   );
@@ -113,7 +113,7 @@ var BaseProvider = class {
   }
   ensureApiKey(config) {
     if (!config.apiKey) {
-      throw new Error(`Missing API key for provider "${config.provider}". Run "magic-cli login".`);
+      throw new Error(`Missing API key for provider "${config.provider}". Run "magique-cli login".`);
     }
     return config.apiKey;
   }
@@ -299,7 +299,7 @@ ${message} >`)}
 async function loginCommand() {
   const current = getStoredConfig();
   if (!current.provider || !current.model) {
-    throw new Error("Aucun fournisseur configur\xE9. Lancez `magic-cli` d\u2019abord.");
+    throw new Error("Aucun fournisseur configur\xE9. Lancez `magique-cli` d\u2019abord.");
   }
   const provider = getProvider(current.provider);
   const apiKey = await promptPassword(`Entrez la cl\xE9 API pour ${provider.label}`);
@@ -319,7 +319,7 @@ function logoutCommand() {
 async function modelCommand() {
   const current = getStoredConfig();
   if (!current.provider) {
-    throw new Error("Aucun fournisseur configur\xE9. Lancez `magic-cli` d\u2019abord.");
+    throw new Error("Aucun fournisseur configur\xE9. Lancez `magique-cli` d\u2019abord.");
   }
   const provider = getProvider(current.provider);
   const models = await provider.getModels();
@@ -390,7 +390,8 @@ var TERMINAL_SYSTEM_PROMPT = [
   "Par d\xE9faut, \xE9vite le Markdown d\xE9coratif.",
   "Si tu donnes du code, pr\xE9f\xE8re un bloc clair et compact.",
   "Fais des r\xE9ponses courtes, propres et lisibles dans un terminal.",
-  "Tu peux utiliser des listes simples si cela aide la lecture."
+  "Ajoute des retours \xE0 la ligne naturels entre les id\xE9es.",
+  "Quand il y a plusieurs points, utilise des listes simples."
 ].join(" ");
 function buildTerminalMessages(messages) {
   return [
@@ -406,6 +407,58 @@ function createResponseFormatter() {
   let insideCodeFence = false;
   let currentCodeLanguage = "";
   let currentCodeLines = [];
+  const proseWidth = Math.max(48, Math.min((process.stdout.columns ?? 80) - 4, 92));
+  const wrapLine = (line, width) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return [""];
+    }
+    const indentMatch = line.match(/^(\s*[-*]\s+|\s*\d+\.\s+|\s+)/);
+    const indent = indentMatch?.[0] ?? "";
+    const content = trimmed.startsWith(indent.trim()) ? trimmed.slice(indent.trim().length).trimStart() : trimmed;
+    const words = content.split(/\s+/).filter(Boolean);
+    const lines = [];
+    const nextIndent = indent ? " ".repeat(indent.length) : "";
+    let current = indent;
+    for (const word of words) {
+      const candidate = current.trim().length === 0 ? `${current}${word}` : `${current} ${word}`;
+      if (candidate.length <= width || current.trim().length === 0) {
+        current = candidate;
+        continue;
+      }
+      lines.push(current);
+      current = `${nextIndent}${word}`;
+    }
+    if (current) {
+      lines.push(current);
+    }
+    return lines;
+  };
+  const formatProse = (text) => {
+    const normalized = text.replace(/\s+([?!:;,])/g, "$1").replace(/\s+-\s+/g, "\n- ").replace(/([.?!])\s+([A-ZÀ-ÖØ-Þ])/g, "$1\n$2").replace(/:\s+(-\s+)/g, ":\n$1");
+    return normalized.split("\n").flatMap((line) => wrapLine(line, proseWidth)).join("\n");
+  };
+  const flushProseBuffer = (force = false) => {
+    if (!buffer) {
+      return "";
+    }
+    const newlineIndex = buffer.lastIndexOf("\n");
+    const sentenceBreakRegex = /([.?!:])\s+(?=[A-ZÀ-ÖØ-Þ0-9-])/g;
+    let splitIndex = newlineIndex;
+    let match = null;
+    for (const current of buffer.matchAll(sentenceBreakRegex)) {
+      match = current;
+    }
+    if (match && (match.index ?? -1) > splitIndex) {
+      splitIndex = (match.index ?? 0) + match[0].length - 1;
+    }
+    if (!force && splitIndex < 0 && buffer.length < proseWidth) {
+      return "";
+    }
+    const chunk = splitIndex >= 0 ? buffer.slice(0, splitIndex + 1) : buffer;
+    buffer = splitIndex >= 0 ? buffer.slice(splitIndex + 1).trimStart() : "";
+    return formatProse(chunk);
+  };
   const sanitizeLine = (line) => {
     const trimmed = line.trim();
     if (trimmed.startsWith("```")) {
@@ -430,18 +483,37 @@ function createResponseFormatter() {
     output2 = output2.replace(/`([^`]+)`/g, (_, code) => chalk5.yellow(code));
     return output2;
   };
-  const flushCompleteLines = () => {
-    const parts = buffer.split("\n");
-    buffer = parts.pop() ?? "";
-    return parts.map((line) => sanitizeLine(line)).filter((line, index, array) => !(line === "" && array[index - 1] === "")).join("\n");
-  };
   return {
     push(chunk) {
+      if (insideCodeFence) {
+        buffer += chunk;
+        const parts = buffer.split("\n");
+        buffer = parts.pop() ?? "";
+        return parts.map((line) => sanitizeLine(line)).filter((line, index, array) => !(line === "" && array[index - 1] === "")).join("\n");
+      }
+      const codeFenceIndex = chunk.indexOf("```");
+      if (codeFenceIndex >= 0) {
+        const before = chunk.slice(0, codeFenceIndex);
+        const after = chunk.slice(codeFenceIndex);
+        buffer += before;
+        const prose = flushProseBuffer(true);
+        buffer = "";
+        buffer += after;
+        const parts = buffer.split("\n");
+        buffer = parts.pop() ?? "";
+        const formattedCode = parts.map((line) => sanitizeLine(line)).filter((line, index, array) => !(line === "" && array[index - 1] === "")).join("\n");
+        return [prose, formattedCode].filter(Boolean).join("\n");
+      }
       buffer += chunk;
-      return flushCompleteLines();
+      return flushProseBuffer(false);
     },
     finish() {
-      let tail = sanitizeLine(buffer);
+      let tail = "";
+      if (!insideCodeFence) {
+        tail += flushProseBuffer(true);
+      } else {
+        tail += sanitizeLine(buffer);
+      }
       if (insideCodeFence && currentCodeLines.length > 0) {
         tail += renderCodeBlock(currentCodeLines.join("\n"), currentCodeLanguage);
         insideCodeFence = false;
@@ -449,7 +521,7 @@ function createResponseFormatter() {
         currentCodeLines = [];
       }
       buffer = "";
-      return tail;
+      return tail.trimEnd();
     }
   };
 }
@@ -583,7 +655,7 @@ async function ensureConfigured() {
   await runOnboarding();
   process.stdout.write(chalk6.green("Configuration enregistr\xE9e avec succ\xE8s.\n"));
 }
-program.name("magic-cli").description("Une CLI IA moderne multi-fournisseurs").version("0.1.0");
+program.name("magique-cli").description("Une CLI IA moderne multi-fournisseurs").version("0.1.0");
 program.command("login").description("D\xE9finir ou mettre \xE0 jour la cl\xE9 API").action(async () => {
   await loginCommand();
   process.stdout.write(chalk6.green("Cl\xE9 API enregistr\xE9e.\n"));

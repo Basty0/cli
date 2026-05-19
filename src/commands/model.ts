@@ -5,7 +5,7 @@ import { promptSelectOrCustom } from '../utils/prompts.js';
 export async function modelCommand(): Promise<void> {
   const current = getStoredConfig();
   if (!current.provider) {
-    throw new Error('Aucun fournisseur configuré. Lancez `magic-cli` d’abord.');
+    throw new Error('Aucun fournisseur configuré. Lancez `magique-cli` d’abord.');
   }
 
   const provider = getProvider(current.provider);

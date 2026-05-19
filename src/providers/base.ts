@@ -14,7 +14,7 @@ export abstract class BaseProvider implements Provider {
 
   protected ensureApiKey(config: ProviderConfig): string {
     if (!config.apiKey) {
-      throw new Error(`Missing API key for provider "${config.provider}". Run "magic-cli login".`);
+      throw new Error(`Missing API key for provider "${config.provider}". Run "magique-cli login".`);
     }
 
     return config.apiKey;

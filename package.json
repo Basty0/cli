@@ -4,7 +4,7 @@
   "description": "Modern multi-provider AI chat CLI",
   "type": "module",
   "bin": {
-    "magic-cli": "./dist/index.js"
+    "magique-cli": "dist/index.js"
   },
   "files": [
     "dist"

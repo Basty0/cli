@@ -14,7 +14,7 @@ export function renderWelcome(): string {
       padding: 1,
       margin: 1,
       borderColor: 'cyan',
-      title: ' magic-cli ',
+      title: ' magique-cli ',
       titleAlignment: 'center',
     },
   );
